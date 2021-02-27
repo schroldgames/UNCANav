@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.schrold.uncanav">
+
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
+    <application
+        android:allowBackup="true"
+        android:hardwareAccelerated="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.UNCANav">
+        <activity android:name="com.schrold.uncanav.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name="com.schrold.uncanav.DownloadMap">
+
+        </activity>
+
+        <!-- HERE Positioning Service definition. -->
+        <service
+            android:name="com.here.services.internal.LocationService"
+            android:enabled="true"
+            android:exported="false"
+            android:process=":remote">
+        </service>
+
+        <meta-data android:name="com.here.android.maps.appid" android:value="pDLzf5Xlso3nj3DFG6hT"/>
+        <meta-data android:name="com.here.android.maps.apptoken" android:value="TrhaoTPMj0WQ8IRO7MmjQw"/>
+        <meta-data android:name="com.here.android.maps.license.key" android:value="SGTvVXHRaQrd7oHP8lQPv/zil2tRsghrBzEyG9EXz8zqnF8ypiI0uG3bhH4aLzS3ebBbRDDBDQ5hNdPtrDpxp/qUH+krsh75AcE31nfSpgnvjvxQLouj30uP6Z+qA8wD0fH8GOrC6dVs7MXrBxGcH0Bu6pUP/Y27PhyFQ3FMX0PIJY0oDWmw33KhgOlmaG7cPtEfm/RZkxvM2n8sbkm8+I1K6wdoISw6Fh2PSNMKBAwIsOCNSEUIqxQAv4lUd1IsX8yRF4hfiF1dPdI9+jwo9x+0LnxcoQqmX7StCh0ZtTPowa3HQMMrElfgVT2Had0aPSLKVTiUgApmm27XV/lq+Ke1pb9KCq++riD7PTUbdgClDJSIAAuZj4Oy/zDvtsXITBMNhidDAlyFBnLtrqA6hN8Cjxaz/fNVP156wWdynW1hOWquM83e4rhmlYKART5azsm2eOVM6A8EiguR7Z4IqNx2GRlwdBFtl2u3mI47KBnlfS5gNbgWch7lufPj+C9p9PNmyhKskGQpbt0LUY9nMeym/CuXqnqi3BW2P2EG6zRq1HT2hbDO5vXeIASK0wYSRirR2jtD2d0iWVEsNmwvQk8BKDbThuP5YseInZrTEtQ3h7mPbr4wgC/xJG346yU02XoZnpVfpk2loYMe8kYCnNT6ikBN4kc5B65rq+Duf+k="/>
+
+    </application>
+
+</manifest>
