@@ -17,6 +17,8 @@ import androidx.core.content.ContextCompat;
 import com.here.android.mpa.common.PositioningManager;
 import com.here.android.mpa.mapping.AndroidXMapFragment;
 
+import org.w3c.dom.Text;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,7 +27,7 @@ import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements TextToSpeech.OnInitListener {
 
     // permissions request code
     private final static int REQUEST_CODE_ASK_PERMISSIONS = 1234;
@@ -55,9 +57,11 @@ public class MainActivity extends AppCompatActivity {
     // tts engine
     public static TextToSpeech textToSpeech;
 
+    private boolean speakable = false;
+
     private final int DL_ACTIVITY_CODE = 1;
 
-   @Override
+    @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
@@ -102,7 +106,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void initializeMaps() {
-       // change view
+        // change view
         setContentView(R.layout.activity_main);
         // initialize map fragment on a new thread
         mapFragment = new MapFragmentActivity(this, getMapFragment(), LOCATION_METHOD);
@@ -179,7 +183,7 @@ public class MainActivity extends AppCompatActivity {
     // Stop listening to position when application is paused
     public void onPause() {
         System.out.println("pausing in main activity");
-        if(textToSpeech != null) {
+        if(textToSpeech != null && speakable) {
             textToSpeech.stop();
         }
         if (mapFragment != null) {
@@ -199,7 +203,7 @@ public class MainActivity extends AppCompatActivity {
     // Cleanup after application is closed
     public void onDestroy() {
         System.out.println("destroying main act");
-        if(textToSpeech != null) {
+        if(textToSpeech != null && speakable) {
             textToSpeech.stop();
             textToSpeech.shutdown();
         }
@@ -246,5 +250,13 @@ public class MainActivity extends AppCompatActivity {
                 deleteRecursive(child);
 
         fileOrDirectory.delete();
+    }
+
+    // Runs on the initializtion of textToSpeech
+    @Override
+    public void onInit(int status) {
+        if (status == TextToSpeech.SUCCESS) {
+            speakable = true;
+        }
     }
 }
