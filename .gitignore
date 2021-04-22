@@ -4,8 +4,8 @@
 *.ap_
 *.aab
 
-# Don't ignore HERE-sdk.aar
-!HERE-sdk.aar
+# Ignore external libraries (HERE SDK .aar and javadoc)
+libs/
 
 # Files for the ART/Dalvik VM
 *.dex
