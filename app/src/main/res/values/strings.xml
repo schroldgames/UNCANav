@@ -1,4 +1,13 @@
 <resources>
-    <string name="app_name">UNCANav</string>
+    <string name="app_name">UNCA Nav</string>
     <string name="engine_init_error">Map engine initialization</string>
+    <string name="MapDataInstallComplete">Map data installation completed</string>
+    <string name="MapDataInstallFail">Map data installation failed</string>
+    <string name="NoUpdates">No updates available</string>
+    <string name="UpdatesAvailable">Updates available</string>
+    <string name="Installing">Installing…</string>
+    <string name="MPRetrieved">Map packages retrieved</string>
+    <string name="Initializing">Initializing…</string>
+    <string name="UpdateComplete">Updates completed</string>
+    <string name="fetching_map_content">Fetching Map Content</string>
 </resources>

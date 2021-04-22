@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
@@ -32,7 +33,7 @@
             </intent-filter>
         </activity>
 
-        <activity android:name="com.schrold.uncanav.DownloadMap">
+        <activity android:name="com.schrold.uncanav.MapDownloadActivity">
 
         </activity>
 
@@ -44,10 +45,21 @@
             android:process=":remote">
         </service>
 
-        <meta-data android:name="com.here.android.maps.appid" android:value="***REMOVED***"/>
-        <meta-data android:name="com.here.android.maps.apptoken" android:value="***REMOVED***"/>
-        <meta-data android:name="com.here.android.maps.license.key" android:value="***REMOVED***"/>
+        <meta-data android:name="com.here.android.maps.appid"
+            android:value="***REMOVED***"/>
+        <meta-data android:name="com.here.android.maps.apptoken"
+            android:value="***REMOVED***"/>
+        <meta-data android:name="com.here.android.maps.license.key"
+            android:value="***REMOVED***"/>
 
     </application>
+
+    <queries>
+        <intent>
+            <action
+                android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
 
 </manifest>

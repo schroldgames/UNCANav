@@ -5,7 +5,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.StrictMode;
-import android.view.View;
+import android.view.WindowManager;
 import android.widget.Toast;
 import android.speech.tts.TextToSpeech;
 
@@ -17,8 +17,6 @@ import androidx.core.content.ContextCompat;
 import com.here.android.mpa.common.PositioningManager;
 import com.here.android.mpa.mapping.AndroidXMapFragment;
 
-import org.w3c.dom.Text;
-
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,10 +25,13 @@ import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class MainActivity extends AppCompatActivity implements TextToSpeech.OnInitListener {
+public class MainActivity extends AppCompatActivity {
 
-    // permissions request code
+    // Request code for application permissions
     private final static int REQUEST_CODE_ASK_PERMISSIONS = 1234;
+
+    // Activity result code for MapDownloadActivity
+    private final int DL_ACTIVITY_CODE = 5678;
 
     /**
      * Permissions that need to be explicitly requested from end user.
@@ -44,87 +45,97 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             Manifest.permission.READ_EXTERNAL_STORAGE,
             Manifest.permission.WRITE_EXTERNAL_STORAGE};
 
-    // map fragment activity
-    private MapFragmentActivity mapFragment = null;
+    // Map fragment activity
+    private MapFragmentHandler mapFragmentHandler = null;
 
-    // Location method
-    private PositioningManager.LocationMethod LOCATION_METHOD
-            = PositioningManager.LocationMethod.GPS;
+    // Location method to be used by PositioningManager
+    private final PositioningManager.LocationMethod LOCATION_METHOD
+            = PositioningManager.LocationMethod.GPS_NETWORK_INDOOR;
 
-    // thread executor service
+    // Executor for multithreading processes
     public static ExecutorService executorService;
 
-    // tts engine
+    // Engine to be used with Google's Text-to-Speech
     public static TextToSpeech textToSpeech;
 
-    private boolean speakable = false;
+    // Flag for the initialization of TTS engine
+    private boolean canSpeak = false;
 
-    private final int DL_ACTIVITY_CODE = 1;
-
+    /**
+     * Called when application is started.
+     * @param savedInstanceState
+     */
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        Thread.setDefaultUncaughtExceptionHandler(new MyUncaughtExceptionHandler());
+        // Keep the screen on when in the app
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
+        // Setting up multithreading
+        Thread.setDefaultUncaughtExceptionHandler(new MyUncaughtExceptionHandler());
         StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder()
                 .permitDiskReads()
                 .permitDiskWrites()
                 .build();
         StrictMode.setThreadPolicy(policy);
 
+        // Creating a pool of 4 threads
         executorService =  Executors.newFixedThreadPool(4);
 
-
+        // Check the user's permissions, then proceed
         checkPermissions();
     }
 
-
-    // handle return from activity result
+    /**
+     * Handles result returned by requested activity.
+     * @param requestCode the request code for the activity
+     * @param resultCode the result code returned by the activity
+     * @param data intent data returned by activity
+     */
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == DL_ACTIVITY_CODE && resultCode == RESULT_OK) {
-            // successfully downloaded map data
+            // Successfully downloaded map data
             System.out.println("updated");
+            // Initialize the map for the user
             initializeMaps();
+        } else {
+            // Exit if map data failed to download
+            finish();
+            return;
         }
     }
 
-    // Initialize the application
+    /**
+     * Initialize the application.
+     */
     private void initialize() {
         // This will use external storage to save map cache data
         //deleteRecursive(new File(this.getExternalFilesDir(null), ".here-maps"));
         File externalCacheFile = new File(this.getExternalFilesDir(null), ".here-maps");
         com.here.android.mpa.common.MapSettings.setDiskCacheRootPath(externalCacheFile.getAbsolutePath());
 
-        // initialize texttospeech in background thread
+        // Initialize TTS engine in background thread
         executorService.execute(runTTS());
 
-        // update map data and download it in background thread
-        System.out.println("starting activity for dl");
-        executorService.execute(runMapCheck());
+        // Update and download map data in background thread
+        executorService.execute(runMapDownload());
     }
 
+    /**
+     * Initialize the map view.
+     */
     private void initializeMaps() {
-        // change view
+        // Set the content view to main activity
         setContentView(R.layout.activity_main);
-        // initialize map fragment on a new thread
-        mapFragment = new MapFragmentActivity(this, getMapFragment(), LOCATION_METHOD);
+
+        // Initialize map fragment on a new thread
+        mapFragmentHandler = new MapFragmentHandler(this, getMapFragment(), LOCATION_METHOD);
         executorService.execute(new Runnable() {
             @Override
             public void run() {
-                mapFragment.initialize();
-            }
-        });
-        // queue positioning service on a new thread
-        executorService.execute(new Runnable() {
-            @Override
-            public void run() {
-                while (!mapFragment.isEngineInit()) {
-                    // wait till mapEngine is initialized
-                }
-                System.out.println("Engine is initialized!");
-                mapFragment.initPositioning();
+                mapFragmentHandler.initialize();
             }
         });
     }
@@ -154,6 +165,13 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         }
     }
 
+    /**
+     * Called when all permissions have been checked by the user. If user has granted all required
+     * permissions, the application continues.
+     * @param requestCode
+     * @param permissions
+     * @param grantResults
+     */
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[],
                                            @NonNull int[] grantResults) {
@@ -168,53 +186,73 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                         return;
                     }
                 }
-                // all permissions were granted
+                // all permissions were granted, continue with application
                 initialize();
                 break;
         }
     }
 
-    // Retrieves the map fragment from main layout
+    /**
+     * Retrieves the Android MapFragment for mapping purposes.
+     * @return
+     */
     public AndroidXMapFragment getMapFragment() {
         return (AndroidXMapFragment) getSupportFragmentManager().findFragmentById(R.id.mapfragment);
     }
 
 
-    // Stop listening to position when application is paused
+    /**
+     * Called when application is paused.
+     */
     public void onPause() {
-        System.out.println("pausing in main activity");
-        if(textToSpeech != null && speakable) {
+        // Stop TTS engine
+        if(textToSpeech != null && canSpeak) {
             textToSpeech.stop();
         }
-        if (mapFragment != null) {
-            mapFragment.pause();
+
+        // Stop positioning updates
+        if (mapFragmentHandler != null) {
+            mapFragmentHandler.pause();
         }
         super.onPause();
     }
 
-    // Start listening to position when application is resumed
+    /**
+     * Called when application is resumed.
+     */
     public void onResume() {
-        if (mapFragment != null && mapFragment.isEngineInit()) {
-            mapFragment.resume();
+
+        // Resume positioning updates
+        if (mapFragmentHandler != null && mapFragmentHandler.isEngineInit()) {
+            mapFragmentHandler.resume();
         }
         super.onResume();
     }
 
-    // Cleanup after application is closed
+    /**
+     * Cleans up after application is closed.
+     */
     public void onDestroy() {
-        System.out.println("destroying main act");
-        if(textToSpeech != null && speakable) {
+        // Shuts down TTS engine
+        if(textToSpeech != null && canSpeak) {
             textToSpeech.stop();
             textToSpeech.shutdown();
         }
-        if (mapFragment != null) {
-            mapFragment.destroy();
-            mapFragment = null;
+
+        // Stops positioning updates
+        if (mapFragmentHandler != null) {
+            mapFragmentHandler.destroy();
+            mapFragmentHandler = null;
         }
+        // Shuts down thread executor service
         executorService.shutdown();
         super.onDestroy();
     }
 
+    /**
+     * Returns a runnable object for instantiating the TTS engine.
+     * @return
+     */
     private Runnable runTTS() {
         return
                 new Runnable() {
@@ -225,15 +263,19 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                             public void onInit(int status) {
                                 if(status != TextToSpeech.ERROR) {
                                     textToSpeech.setLanguage(Locale.US);
+                                    canSpeak = true;
                                 }
                             }});
                     }
                 };
     }
 
-    // returns a runnable that runs the map check
-    private Runnable runMapCheck() {
-        Intent intent = new Intent(this, DownloadMap.class);
+    /**
+     * Returns a runnable object for downloading map data.
+     * @return
+     */
+    private Runnable runMapDownload() {
+        Intent intent = new Intent(this, MapDownloadActivity.class);
         return
                 new Runnable() {
                     @Override
@@ -252,11 +294,11 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         fileOrDirectory.delete();
     }
 
-    // Runs on the initializtion of textToSpeech
+    /*
     @Override
     public void onInit(int status) {
         if (status == TextToSpeech.SUCCESS) {
-            speakable = true;
+            canSpeak = true;
         }
-    }
+    }*/
 }
