@@ -45,12 +45,13 @@
             android:process=":remote">
         </service>
 
+        <!-- HERE API Keys -->
         <meta-data android:name="com.here.android.maps.appid"
-            android:value="***REMOVED***"/>
+            android:value="${HEREAppID}"/>
         <meta-data android:name="com.here.android.maps.apptoken"
-            android:value="***REMOVED***"/>
+            android:value="${HEREAppToken}"/>
         <meta-data android:name="com.here.android.maps.license.key"
-            android:value="***REMOVED***"/>
+            android:value="${HERELicenseKey}"/>
 
     </application>
 
