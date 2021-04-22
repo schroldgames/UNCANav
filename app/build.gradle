@@ -17,9 +17,9 @@ android {
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-        manifestPlaceholders = [HEREAppID: localProperties['here.appid'],
-                                HEREAppToken: localProperties['here.apptoken'],
-                                HERELicenseKey: localProperties['here.license.key']]
+        manifestPlaceholders = [HEREAppID       :   localProperties['here.appid'],
+                                HEREAppToken    :   localProperties['here.apptoken'],
+                                HERELicenseKey  :   localProperties['here.license.key']]
     }
 
     buildTypes {
