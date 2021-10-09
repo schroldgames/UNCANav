@@ -14,9 +14,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import com.here.android.mpa.common.PositioningManager;
-import com.here.android.mpa.mapping.AndroidXMapFragment;
-
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,7 +28,7 @@ public class MainActivity extends AppCompatActivity {
     private final static int REQUEST_CODE_ASK_PERMISSIONS = 1234;
 
     // Activity result code for MapDownloadActivity
-    private final int DL_ACTIVITY_CODE = 5678;
+    private final int DL_ACTIVITY_CODE = 5679;
 
     /**
      * Permissions that need to be explicitly requested from end user.
@@ -46,11 +43,7 @@ public class MainActivity extends AppCompatActivity {
             Manifest.permission.WRITE_EXTERNAL_STORAGE};
 
     // Map fragment activity
-    private MapFragmentHandler mapFragmentHandler = null;
-
-    // Location method to be used by PositioningManager
-    private final PositioningManager.LocationMethod LOCATION_METHOD
-            = PositioningManager.LocationMethod.GPS_NETWORK_INDOOR;
+    private MapFragmentView mapFragmentView = null;
 
     // Executor for multithreading processes
     public static ExecutorService executorService;
@@ -60,6 +53,8 @@ public class MainActivity extends AppCompatActivity {
 
     // Flag for the initialization of TTS engine
     private boolean canSpeak = false;
+
+
 
     /**
      * Called when application is started.
@@ -97,13 +92,16 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == DL_ACTIVITY_CODE && resultCode == RESULT_OK) {
             // Successfully downloaded map data
-            System.out.println("updated");
+            System.out.println("dl completed successfully");
             // Initialize the map for the user
             initializeMaps();
         } else {
             // Exit if map data failed to download
-            finish();
-            return;
+            // Try again
+            System.out.println("map data failed to dl");
+            executorService.execute(runMapDownload());
+            // finish();
+            // return;
         }
     }
 
@@ -131,11 +129,11 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         // Initialize map fragment on a new thread
-        mapFragmentHandler = new MapFragmentHandler(this, getMapFragment(), LOCATION_METHOD);
+        mapFragmentView = new MapFragmentView(this);
         executorService.execute(new Runnable() {
             @Override
             public void run() {
-                mapFragmentHandler.initialize();
+                mapFragmentView.initialize();
             }
         });
     }
@@ -193,15 +191,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Retrieves the Android MapFragment for mapping purposes.
-     * @return
-     */
-    public AndroidXMapFragment getMapFragment() {
-        return (AndroidXMapFragment) getSupportFragmentManager().findFragmentById(R.id.mapfragment);
-    }
-
-
-    /**
      * Called when application is paused.
      */
     public void onPause() {
@@ -211,8 +200,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // Stop positioning updates
-        if (mapFragmentHandler != null) {
-            mapFragmentHandler.pause();
+        if (mapFragmentView != null) {
+            mapFragmentView.pause();
         }
         super.onPause();
     }
@@ -223,8 +212,8 @@ public class MainActivity extends AppCompatActivity {
     public void onResume() {
 
         // Resume positioning updates
-        if (mapFragmentHandler != null && mapFragmentHandler.isEngineInit()) {
-            mapFragmentHandler.resume();
+        if (mapFragmentView != null && mapFragmentView.isEngineInit()) {
+            mapFragmentView.resume();
         }
         super.onResume();
     }
@@ -240,9 +229,9 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // Stops positioning updates
-        if (mapFragmentHandler != null) {
-            mapFragmentHandler.destroy();
-            mapFragmentHandler = null;
+        if (mapFragmentView != null) {
+            mapFragmentView.destroy();
+            mapFragmentView = null;
         }
         // Shuts down thread executor service
         executorService.shutdown();
@@ -275,7 +264,7 @@ public class MainActivity extends AppCompatActivity {
      * @return
      */
     private Runnable runMapDownload() {
-        Intent intent = new Intent(this, MapDownloadActivity.class);
+        final Intent intent = new Intent(this, MapDownloadActivity_backup.class);
         return
                 new Runnable() {
                     @Override
@@ -294,11 +283,5 @@ public class MainActivity extends AppCompatActivity {
         fileOrDirectory.delete();
     }
 
-    /*
-    @Override
-    public void onInit(int status) {
-        if (status == TextToSpeech.SUCCESS) {
-            canSpeak = true;
-        }
-    }*/
+
 }

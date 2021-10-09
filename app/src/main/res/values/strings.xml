@@ -1,13 +1,15 @@
 <resources>
     <string name="app_name">UNCA Nav</string>
     <string name="engine_init_error">Map engine initialization</string>
-    <string name="MapDataInstallComplete">Map data installation completed</string>
-    <string name="MapDataInstallFail">Map data installation failed</string>
-    <string name="NoUpdates">No updates available</string>
-    <string name="UpdatesAvailable">Updates available</string>
-    <string name="Installing">Installing…</string>
-    <string name="MPRetrieved">Map packages retrieved</string>
-    <string name="Initializing">Initializing…</string>
-    <string name="UpdateComplete">Updates completed</string>
+    <string name="m_data_install_complete">Map data installation completed</string>
+    <string name="m_data_install_fail">Map data installation failed</string>
+    <string name="no_updates">No updates available</string>
+    <string name="updates_avail">Updates available</string>
+    <string name="installing">Installing…</string>
+    <string name="map_pack_retrieved">Map packages retrieved</string>
+    <string name="initializing">Initializing…</string>
+    <string name="update_complete">Updates completed</string>
     <string name="fetching_map_content">Fetching Map Content</string>
+    <string name="pos_found">Position found</string>
+    <string name="loc_method_change">Location method changed to</string>
 </resources>
