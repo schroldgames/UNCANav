@@ -9,7 +9,8 @@
     <string name="map_pack_retrieved">Map packages retrieved</string>
     <string name="initializing">Initializing…</string>
     <string name="update_complete">Updates completed</string>
-    <string name="fetching_map_content">Fetching Map Content</string>
-    <string name="pos_found">Position found</string>
+    <string name="fetching_map_content">Fetching map content</string>
+    <string name="pos_found">Welcome to UNCA Nav</string>
     <string name="loc_method_change">Location method changed to</string>
+    <string name="waiting_positioning">Waiting for position updates...</string>
 </resources>

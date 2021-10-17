@@ -129,7 +129,6 @@ public class MapDownloadActivity_backup extends AppCompatActivity {
                         List<Integer> idList = new ArrayList<>();
                         idList.add(nc_mapPackage.getId());
                         m_mapLoader.installMapPackages(idList);
-
                     } else {
                         // Check for updates to the MapPackage
                         m_mapLoader.checkForMapDataUpdate();
@@ -234,7 +233,7 @@ public class MapDownloadActivity_backup extends AppCompatActivity {
      *
      * @param name the name of the state
      * @param m_currentMapPackageList the current map package list
-     * @return  the MapPackage containing the desired state
+     * @return the MapPackage containing the desired state
      */
     private MapPackage getStateMapPackage (String name, ArrayList<MapPackage> m_currentMapPackageList) {
         MapPackage state = null;

@@ -38,8 +38,6 @@ public class MainActivity extends AppCompatActivity {
             Manifest.permission.INTERNET,
             Manifest.permission.ACCESS_WIFI_STATE,
             Manifest.permission.ACCESS_NETWORK_STATE,
-            Manifest.permission.READ_PHONE_STATE,
-            Manifest.permission.READ_EXTERNAL_STORAGE,
             Manifest.permission.WRITE_EXTERNAL_STORAGE};
 
     // Map fragment activity
@@ -54,11 +52,9 @@ public class MainActivity extends AppCompatActivity {
     // Flag for the initialization of TTS engine
     private boolean canSpeak = false;
 
-
-
     /**
      * Called when application is started.
-     * @param savedInstanceState
+     * @param savedInstanceState unused
      */
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -72,6 +68,7 @@ public class MainActivity extends AppCompatActivity {
         StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder()
                 .permitDiskReads()
                 .permitDiskWrites()
+                .permitNetwork()
                 .build();
         StrictMode.setThreadPolicy(policy);
 
@@ -96,12 +93,9 @@ public class MainActivity extends AppCompatActivity {
             // Initialize the map for the user
             initializeMaps();
         } else {
-            // Exit if map data failed to download
-            // Try again
+            // Map data failed to download
             System.out.println("map data failed to dl");
-            executorService.execute(runMapDownload());
-            // finish();
-            // return;
+            finish();
         }
     }
 
@@ -109,8 +103,9 @@ public class MainActivity extends AppCompatActivity {
      * Initialize the application.
      */
     private void initialize() {
-        // This will use external storage to save map cache data
         //deleteRecursive(new File(this.getExternalFilesDir(null), ".here-maps"));
+
+        // This will use external storage to save map cache data
         File externalCacheFile = new File(this.getExternalFilesDir(null), ".here-maps");
         com.here.android.mpa.common.MapSettings.setDiskCacheRootPath(externalCacheFile.getAbsolutePath());
 
@@ -142,7 +137,7 @@ public class MainActivity extends AppCompatActivity {
      * Checks the dynamically controlled permissions and requests missing permissions from end user.
      */
     protected void checkPermissions() {
-        final List<String> missingPermissions = new ArrayList<String>();
+        final List<String> missingPermissions = new ArrayList<>();
         // check all required dynamic permissions
         for (final String permission : REQUIRED_SDK_PERMISSIONS) {
             final int result = ContextCompat.checkSelfPermission(this, permission);
@@ -166,34 +161,34 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Called when all permissions have been checked by the user. If user has granted all required
      * permissions, the application continues.
-     * @param requestCode
-     * @param permissions
-     * @param grantResults
+     * @param requestCode permissions request code
+     * @param permissions permissions to be requested
+     * @param grantResults array of permission results
      */
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[],
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
-        switch (requestCode) {
-            case REQUEST_CODE_ASK_PERMISSIONS:
-                for (int index = permissions.length - 1; index >= 0; --index) {
-                    if (grantResults[index] != PackageManager.PERMISSION_GRANTED) {
-                        // exit the app if one permission is not granted
-                        Toast.makeText(this, "Required permission '" + permissions[index]
-                                + "' not granted, exiting", Toast.LENGTH_LONG).show();
-                        finish();
-                        return;
-                    }
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_CODE_ASK_PERMISSIONS) {
+            for (int index = permissions.length - 1; index >= 0; --index) {
+                if (grantResults[index] != PackageManager.PERMISSION_GRANTED) {
+                    // exit the app if one permission is not granted
+                    Toast.makeText(this, "Required permission '" + permissions[index]
+                            + "' not granted, exiting", Toast.LENGTH_LONG).show();
+                    finish();
+                    return;
                 }
-                // all permissions were granted, continue with application
-                initialize();
-                break;
+            }
+            // all permissions were granted, continue with application
+            initialize();
         }
     }
 
     /**
      * Called when application is paused.
      */
-    public void onPause() {
+    @Override
+    protected void onPause() {
         // Stop TTS engine
         if(textToSpeech != null && canSpeak) {
             textToSpeech.stop();
@@ -209,19 +204,20 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Called when application is resumed.
      */
-    public void onResume() {
-
+    @Override
+    protected void onResume() {
+        super.onResume();
         // Resume positioning updates
         if (mapFragmentView != null && mapFragmentView.isEngineInit()) {
             mapFragmentView.resume();
         }
-        super.onResume();
     }
 
     /**
      * Cleans up after application is closed.
      */
-    public void onDestroy() {
+    @Override
+    protected void onDestroy() {
         // Shuts down TTS engine
         if(textToSpeech != null && canSpeak) {
             textToSpeech.stop();
@@ -240,7 +236,6 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * Returns a runnable object for instantiating the TTS engine.
-     * @return
      */
     private Runnable runTTS() {
         return
@@ -261,10 +256,9 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * Returns a runnable object for downloading map data.
-     * @return
      */
     private Runnable runMapDownload() {
-        final Intent intent = new Intent(this, MapDownloadActivity_backup.class);
+        final Intent intent = new Intent(this, MapDownloadActivity_bbox.class);
         return
                 new Runnable() {
                     @Override
@@ -280,7 +274,6 @@ public class MainActivity extends AppCompatActivity {
             for (File child : fileOrDirectory.listFiles())
                 deleteRecursive(child);
 
-        fileOrDirectory.delete();
     }
 
 
