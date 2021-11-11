@@ -1,7 +1,3 @@
-/**
- * Helper activity to download and cache map data to the user's device.
- */
-
 // TODO: download radio map data
 
 package com.schrold.uncanav;
@@ -21,26 +17,22 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.here.android.mpa.common.ApplicationContext;
 import com.here.android.mpa.common.GeoBoundingBox;
 import com.here.android.mpa.common.GeoCoordinate;
-import com.here.android.mpa.common.LocationDataSourceHERE;
 import com.here.android.mpa.common.MapEngine;
 import com.here.android.mpa.common.OnEngineInitListener;
 import com.here.android.mpa.odml.MapLoader;
 import com.here.android.mpa.odml.MapPackage;
 import com.here.android.mpa.prefetcher.MapDataPrefetcher;
-import com.here.android.positioning.radiomap.RadioMapLoader;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 
+/**
+ * Helper activity to download and cache map data to the user's device.
+ */
 public class MapDownloadActivity_bbox extends AppCompatActivity
         implements MapLoader.MapPackageAtCoordinateListener {
 
     // The MapLoader object for downloading map data
     private MapLoader m_mapLoader;
-
-    // The RadioMapLoader object for downloading radio map data
-    private RadioMapLoader m_radioMapLoader;
 
     // The TextView object for displaying information below the progress bar
     private TextView textView;
@@ -56,20 +48,24 @@ public class MapDownloadActivity_bbox extends AppCompatActivity
      * Begins the activity by setting the view, initializing variables, and
      * starting the download process.
      *
-     * @param savedInstanceState
+     * @param savedInstanceState saved instance state
      */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Initialize layout
         setContentView(R.layout.activity_load);
         textView = findViewById(R.id.errorText);
         progressBar = findViewById(R.id.progressBar);
-        textView.setText(R.string.initializing);
+        textView.setText(getResources().getString(R.string.initializing));
+
         startDownload();
     }
 
     /**
-     * Wrapper method to finish activity.
+     * Wrapper method to finish the activity.
+     *
      * @param result the result to return to this activity's caller
      */
     private void finishResult(int result) {
@@ -90,20 +86,19 @@ public class MapDownloadActivity_bbox extends AppCompatActivity
             @Override
             public void onEngineInitializationCompleted(Error error) {
                 if (error == Error.NONE) {
-                    System.out.println("engine initialized for dl");
+                    System.out.println("Map engine initialized for download.");
 
                     // MapLoader object for downloading map data
                     m_mapLoader = MapLoader.getInstance();
 
-                    // RadioMapLoader object for downloading radio map data
-                    //m_radioMapLoader = LocationDataSourceHERE.getInstance().getRadioMapLoader();
-
                     // Begin the MapPackage download process for the MapLoader
                     m_mapLoader.addMapPackageAtCoordinateListener(MapDownloadActivity_bbox.this);
 
+                    // Wait for the device to be connected to the internet.
                     while (!isNetworkAvailable()) {
-                        System.out.println("Network unavailable");
+                        System.out.println("ERROR: Network unavailable.");
                     }
+
                     m_mapLoader.getMapPackageAtCoordinate(new GeoCoordinate(35.615330, -82.5659220));
                 } else {
                     // Error initializing MapEngine, finish
@@ -139,6 +134,9 @@ public class MapDownloadActivity_bbox extends AppCompatActivity
         }
     }
 
+    /**
+     * Contains callback functions for the MapDataPrefetcher.
+     */
     private class PrefetchMapDataListener extends MapDataPrefetcher.Adapter {
         @Override
         public void onDataSizeEstimated(int requestId, boolean success, long dataSizeKB) {
@@ -177,10 +175,15 @@ public class MapDownloadActivity_bbox extends AppCompatActivity
 
         @Override
         public void onCachePurged(boolean b) {
-
+            // Unused
         }
     }
 
+    /**
+     * Determine if the user's device is connected to the internet.
+     *
+     * @return true if network is available
+     */
     private boolean isNetworkAvailable() {
         ConnectivityManager connectivityManager
                 = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);

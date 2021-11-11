@@ -50,7 +50,7 @@ public class MainActivity extends AppCompatActivity {
     public static TextToSpeech textToSpeech;
 
     // Flag for the initialization of TTS engine
-    private boolean canSpeak = false;
+    public static boolean canSpeak = false;
 
     /**
      * Called when application is started.
@@ -63,7 +63,7 @@ public class MainActivity extends AppCompatActivity {
         // Keep the screen on when in the app
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
-        // Setting up multithreading
+        // Setting up multithreading policy
         Thread.setDefaultUncaughtExceptionHandler(new MyUncaughtExceptionHandler());
         StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder()
                 .permitDiskReads()
@@ -81,6 +81,7 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * Handles result returned by requested activity.
+     *
      * @param requestCode the request code for the activity
      * @param resultCode the result code returned by the activity
      * @param data intent data returned by activity
@@ -89,12 +90,12 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == DL_ACTIVITY_CODE && resultCode == RESULT_OK) {
             // Successfully downloaded map data
-            System.out.println("dl completed successfully");
+            System.out.println("Map data successfully downloaded.");
             // Initialize the map for the user
-            initializeMaps();
+            startMap();
         } else {
             // Map data failed to download
-            System.out.println("map data failed to dl");
+            System.out.println("ERROR: Map data failed to download.");
             finish();
         }
     }
@@ -103,9 +104,7 @@ public class MainActivity extends AppCompatActivity {
      * Initialize the application.
      */
     private void initialize() {
-        //deleteRecursive(new File(this.getExternalFilesDir(null), ".here-maps"));
-
-        // This will use external storage to save map cache data
+        // Set up external storage to save map cache data
         File externalCacheFile = new File(this.getExternalFilesDir(null), ".here-maps");
         com.here.android.mpa.common.MapSettings.setDiskCacheRootPath(externalCacheFile.getAbsolutePath());
 
@@ -117,20 +116,28 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Initialize the map view.
+     * Start the map activity, and initialize the map engine.
      */
-    private void initializeMaps() {
+    private void startMap() {
         // Set the content view to main activity
         setContentView(R.layout.activity_main);
 
         // Initialize map fragment on a new thread
         mapFragmentView = new MapFragmentView(this);
-        executorService.execute(new Runnable() {
-            @Override
-            public void run() {
-                mapFragmentView.initialize();
-            }
-        });
+
+        executorService.execute(() -> mapFragmentView.initialize());
+    }
+
+    /**
+     * Outputs a string verbally using text-to-speech.
+     *
+     * @param text the string to speak
+     */
+    public static void speak(String text) {
+        if (canSpeak) {
+            textToSpeech.speak(text,
+                    TextToSpeech.QUEUE_ADD, null, TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID);
+        }
     }
 
     /**
@@ -248,6 +255,9 @@ public class MainActivity extends AppCompatActivity {
                                 if(status != TextToSpeech.ERROR) {
                                     textToSpeech.setLanguage(Locale.US);
                                     canSpeak = true;
+                                    speak(getResources().getString(R.string.start_map_dl));
+                                } else {
+                                    finish();
                                 }
                             }});
                     }
@@ -267,14 +277,4 @@ public class MainActivity extends AppCompatActivity {
                     }
                 };
     }
-
-    /** For debugging purposes. */
-    private void deleteRecursive(File fileOrDirectory) {
-        if (fileOrDirectory.isDirectory())
-            for (File child : fileOrDirectory.listFiles())
-                deleteRecursive(child);
-
-    }
-
-
 }

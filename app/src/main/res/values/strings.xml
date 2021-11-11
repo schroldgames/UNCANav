@@ -12,5 +12,8 @@
     <string name="fetching_map_content">Fetching map content</string>
     <string name="pos_found">Welcome to UNCA Nav</string>
     <string name="loc_method_change">Location method changed to</string>
-    <string name="waiting_positioning">Waiting for position updates...</string>
+    <string name="waiting_positioning">Waiting for position updates…</string>
+    <string name="start_map_dl">Starting map data update</string>
+    <string name="rerouting">Rerouting</string>
+    <string name="arrived">You have arrived</string>
 </resources>

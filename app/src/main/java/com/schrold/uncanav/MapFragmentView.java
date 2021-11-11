@@ -31,19 +31,15 @@ import com.here.android.mpa.ftcr.FTCRRoutePlan;
 import com.here.android.mpa.ftcr.FTCRRouter;
 import com.here.android.mpa.ftcr.FTCRVoiceGuidanceOptions;
 import com.here.android.mpa.guidance.AudioPlayerDelegate;
-import com.here.android.mpa.guidance.NavigationManager;
 import com.here.android.mpa.mapping.FTCRMapRoute;
 import com.here.android.mpa.mapping.Map;
 import com.here.android.mpa.mapping.MapGesture.OnGestureListener;
 import com.here.android.mpa.mapping.MapMarker;
 import com.here.android.mpa.mapping.MapPolyline;
-import com.here.android.mpa.routing.Route;
 import com.here.android.mpa.routing.RouteWaypoint;
 import com.here.android.mpa.routing.RoutingError;
-import com.here.android.mpa.venues3d.CombinedRoute;
 import com.here.android.mpa.venues3d.DeselectionSource;
 import com.here.android.mpa.venues3d.Level;
-import com.here.android.mpa.venues3d.RoutingController.RoutingControllerListener;
 import com.here.android.mpa.venues3d.Space;
 import com.here.android.mpa.venues3d.Venue;
 import com.here.android.mpa.venues3d.VenueMapFragment;
@@ -90,6 +86,10 @@ public class MapFragmentView {
 
     private FTCRRouter.CancellableTask ftcrRoutingTask;
 
+    private boolean speak_welcome = false;
+
+    private MapPolyline currentRoute;
+
 
     /**
      * Constructor for the MapFragmentView class.
@@ -111,7 +111,7 @@ public class MapFragmentView {
     }
 
     /**
-     * Initializes the map engine and calls to start positioning updates.
+     * Initializes the map engine and starts positioning updates.
      */
     public void initialize() {
         mapFragment.init(new OnEngineInitListener() {
@@ -159,16 +159,22 @@ public class MapFragmentView {
                             // Positioning initialization failed
                             showErrorMessage("Positioning initialization", "Positioning initialization failed. Exiting.");
                         }
-
                         // Select Rhoades-Robinson building
                         mapFragment.selectVenueAsync("DM_15755");
-
                         // Initialize the FTCRRouter and NavigationManager
                         router = new FTCRRouter();
                         navigationManager = new FTCRNavigationManager();
+                        // Set up the navigation manager and speech settings
+                        navigationManager.setMap(map);
+                        navigationManager.addNavigationListener(m_FTCRNavigationListener);
+                        navigationManager.setMapTrackingMode(FTCRNavigationManager.TrackingMode.NONE);
+                        navigationManager.getAudioPlayer().setDelegate(m_audioPlayerDelegate);
+                        navigationManager.getVoiceGuidanceOptions().setVoicePromptDistanceRangeFromPreviousManeuver(new FTCRVoiceGuidanceOptions.Range(10, -1));
+                        navigationManager.getVoiceGuidanceOptions().setVoicePromptDistanceRangeToNextManeuver(new FTCRVoiceGuidanceOptions.Range(-1, 4));
+                        navigationManager.getVoiceGuidanceOptions().setVoicePromptTimeRangeToNextManeuver(new FTCRVoiceGuidanceOptions.Range(-1, -1));
                         break;
                     default:
-                        // Means that it failed, retry
+                        // Initialization failed, retry
                         System.out.println("INITSTATUS:" + initStatus.toString());
                         initialize();
                         break;
@@ -178,7 +184,7 @@ public class MapFragmentView {
     }
 
     /**
-     * Initialize the positioning service using LOCATION_METHOD.
+     * Initializes the positioning service using LOCATION_METHOD.
      *
      * @return true if positioning manager has started successfully; false otherwise
      */
@@ -187,7 +193,7 @@ public class MapFragmentView {
         posManager.setDataSource(LocationDataSourceHERE.getInstance());
         posManager.addListener(new WeakReference<>(m_onPositionChangedListener));
         if (!posManager.start(LOCATION_METHOD)) {
-            showToast("PositioningManager.start: failed");
+            showToast("PositioningManager.start: Failed.");
             return false;
         }
         // Set the position and accuracy indicator to be visible
@@ -197,7 +203,7 @@ public class MapFragmentView {
     }
 
     /**
-     * Checks to see whether MapEngine is initialized.
+     * Checks to see whether the MapEngine is initialized.
      *
      * @return true if MapEngine is initialized
      */
@@ -205,7 +211,10 @@ public class MapFragmentView {
         return(MapEngine.isInitialized());
     }
 
-    PositioningManager.OnPositionChangedListener m_onPositionChangedListener = new OnPositionChangedListener() {
+    /**
+     * Contains listener functions for positioning updates.
+     */
+    private final PositioningManager.OnPositionChangedListener m_onPositionChangedListener = new OnPositionChangedListener() {
         @Override
         public void onPositionUpdated(PositioningManager.LocationMethod locationMethod, @Nullable GeoPosition geoPosition, boolean b) {
             /* Set the center only when the app is in the foreground
@@ -213,88 +222,59 @@ public class MapFragmentView {
             if (!paused && geoPosition != null) {
                 map.setCenter(geoPosition.getCoordinate(), Map.Animation.BOW);
                 if (!foundPos) {
-                    MainActivity.textToSpeech.speak(activity.getResources().getString(R.string.pos_found),
-                            TextToSpeech.QUEUE_ADD, null, TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID);
                     foundPos = true;
                 }
+                if (!speak_welcome) {
+                    MainActivity.speak(activity.getResources().getString(R.string.pos_found));
+                    speak_welcome = true;
+                }
             }
-
             // Update the location information in the text view
             updateLocationInfo(geoPosition);
         }
 
         @Override
         public void onPositionFixChanged(PositioningManager.LocationMethod locationMethod, PositioningManager.LocationStatus locationStatus) {
+            // UNUSED
             // Called when the location method has changed
+            /*
             MainActivity.textToSpeech.speak(String.format("%s %s",
                     activity.getResources().getString(R.string.loc_method_change), locationMethod.toString()),
                     TextToSpeech.QUEUE_ADD, null, TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID);
+            */
         }
     };
 
-    private VenueMapFragment.VenueListener m_venueListener = new VenueMapFragment.VenueListener() {
+    /**
+     * Contains listener functions for venue callbacks.
+     */
+    private final VenueMapFragment.VenueListener m_venueListener = new VenueMapFragment.VenueListener() {
         @Override
-        public void onVenueTapped(Venue venue, float v, float v1) {
-
-        }
-
-        @Override
-        public void onVenueSelected(Venue venue) {
-
-        }
+        public void onVenueTapped(Venue venue, float v, float v1) {        }
 
         @Override
-        public void onVenueDeselected(Venue venue, DeselectionSource deselectionSource) {
-
-        }
+        public void onVenueSelected(Venue venue) {        }
 
         @Override
-        public void onSpaceSelected(Venue venue, Space space) {
-
-        }
+        public void onVenueDeselected(Venue venue, DeselectionSource deselectionSource) {        }
 
         @Override
-        public void onSpaceDeselected(Venue venue, Space space) {
-
-        }
+        public void onSpaceSelected(Venue venue, Space space) {        }
 
         @Override
-        public void onFloorChanged(Venue venue, Level level, Level level1) {
-
-        }
+        public void onSpaceDeselected(Venue venue, Space space) {        }
 
         @Override
-        public void onVenueVisibleInViewport(Venue venue, boolean b) {
+        public void onFloorChanged(Venue venue, Level level, Level level1) {        }
 
-        }
+        @Override
+        public void onVenueVisibleInViewport(Venue venue, boolean b) {        }
     };
 
-    private OnGestureListener m_onGestureListener = new OnGestureListener() {
-        @Override
-        public void onPanStart() {
-
-        }
-
-        @Override
-        public void onPanEnd() {
-
-        }
-
-        @Override
-        public void onMultiFingerManipulationStart() {
-
-        }
-
-        @Override
-        public void onMultiFingerManipulationEnd() {
-
-        }
-
-        @Override
-        public boolean onMapObjectsSelected(@NonNull List<ViewObject> list) {
-            return false;
-        }
-
+    /**
+     * Contains listener functions for gesture input callbacks.
+     */
+    private final OnGestureListener m_onGestureListener = new OnGestureListener() {
         @Override
         public boolean onTapEvent(@NonNull PointF pointF) {
             /*
@@ -320,7 +300,8 @@ public class MapFragmentView {
                 // Create the RouteOptions and set transport mode & routing type
                 FTCRRouteOptions routeOptions = new FTCRRouteOptions();
                 routeOptions.setTransportMode(FTCRRouteOptions.TransportMode.PEDESTRIAN);
-                routeOptions.setRouteType(FTCRRouteOptions.Type.FASTEST);
+                routeOptions.setRouteType(FTCRRouteOptions.Type.SHORTEST);
+                routeOptions.enableUTurnAtWaypoint(true);
 
                 // Create the RoutePlan with two waypoints
                 List<RouteWaypoint> routePoints = new ArrayList<>();
@@ -342,27 +323,24 @@ public class MapFragmentView {
                     public void onCalculateRouteFinished(@NonNull List<FTCRRoute> routeResults, @NonNull FTCRRouter.ErrorResponse errorResponse) {
                         // If the route was calculated successfully
                         if (errorResponse.getErrorCode() == RoutingError.NONE) {
-                            // Render the route on the map
-                            FTCRMapRoute mapRoute = new FTCRMapRoute(routeResults.get(0));
+                            // Draw the route on the map
+                            drawRoute(routeResults.get(0));
 
-                            GeoPolyline pl = new GeoPolyline(routeResults.get(0).getGeometry());
-                            MapPolyline rt = new MapPolyline(pl);
-                            //rt.setLineColor(Color.argb(255, 175, 185, 255));
-                            rt.setLineColor(Color.argb(255, 185, 63, 2));
-                            rt.setLineWidth(15);
-                            rt.setPatternStyle(MapPolyline.PatternStyle.DASH_PATTERN);
-                            map.addMapObject(rt);
+                            // Start navigation
+                            navigationManager.simulate(routeResults.get(0), 2);   // causes crash if attempt to stop
+                            //navigationManager.start(routeResults.get(0));
 
-                            navigationManager.setMap(map);
-                            navigationManager.addNavigationListener(m_FTCRNavigationListener);
-                            navigationManager.setMapTrackingMode(FTCRNavigationManager.TrackingMode.NONE);
-                            //navigationManager.simulate(routeResults.get(0), 5);   // causes crash if attempt to stop
-                            navigationManager.getAudioPlayer().setDelegate(m_audioPlayerDelegate);
-                            //navigationManager.getVoiceGuidanceOptions().setVoicePromptDistanceRangeFromPreviousManeuver(new FTCRVoiceGuidanceOptions.Range(0, 2));
-                            navigationManager.start(routeResults.get(0));
-
-                            // Change colors of route
-                            mapRoute.setColor(Color.argb(200, 175, 185, 255));
+                            //TODO: remove
+                            System.out.println("VOICE GUIDANCE STOCK:");
+                            System.out.printf("Dist range from prev maneuver: %d %d%n", navigationManager.getVoiceGuidanceOptions().getVoicePromptDistanceRangeFromPreviousManeuver().min,
+                                    navigationManager.getVoiceGuidanceOptions().getVoicePromptDistanceRangeFromPreviousManeuver().max);
+                            System.out.printf("Dist range to next maneuver: %d %d%n", navigationManager.getVoiceGuidanceOptions().getVoicePromptDistanceRangeToNextManeuver().min,
+                                    navigationManager.getVoiceGuidanceOptions().getVoicePromptDistanceRangeToNextManeuver().max);
+                            System.out.println(navigationManager.getVoiceGuidanceOptions().getVoicePromptTimeBasedDistanceToNextManeuver());
+                            System.out.printf("Time range from prev maneuver: %d %d%n",navigationManager.getVoiceGuidanceOptions().getVoicePromptTimeRangeFromPreviousManeuver().min,
+                                    navigationManager.getVoiceGuidanceOptions().getVoicePromptTimeRangeFromPreviousManeuver().max);
+                            System.out.printf("Time range to next maneuver: %d %d%n",navigationManager.getVoiceGuidanceOptions().getVoicePromptTimeRangeToNextManeuver().min,
+                                    navigationManager.getVoiceGuidanceOptions().getVoicePromptTimeRangeToNextManeuver().max);
                         }
                         else {
                             showToast("Route calculation error!");
@@ -378,10 +356,7 @@ public class MapFragmentView {
             // Remove all map objects on screen and stop navigation
             if (navigationManager != null && navigationManager.isActive()) {
                 navigationManager.getAudioPlayer().stop();
-                navigationManager.removeNavigationListener(m_FTCRNavigationListener);
                 navigationManager.stop();
-                // ONLY IF USING SIMULATION
-                posManager.setDataSource(LocationDataSourceHERE.getInstance());
             }
             if (ftcrRoutingTask != null) {
                 ftcrRoutingTask.cancel();
@@ -391,9 +366,24 @@ public class MapFragmentView {
         }
 
         @Override
-        public void onPinchLocked() {
+        public void onPanStart() {        }
 
+        @Override
+        public void onPanEnd() {        }
+
+        @Override
+        public void onMultiFingerManipulationStart() {        }
+
+        @Override
+        public void onMultiFingerManipulationEnd() {        }
+
+        @Override
+        public boolean onMapObjectsSelected(@NonNull List<ViewObject> list) {
+            return false;
         }
+
+        @Override
+        public void onPinchLocked() {        }
 
         @Override
         public boolean onPinchZoomEvent(float v, @NonNull PointF pointF) {
@@ -401,9 +391,7 @@ public class MapFragmentView {
         }
 
         @Override
-        public void onRotateLocked() {
-
-        }
+        public void onRotateLocked() {        }
 
         @Override
         public boolean onRotateEvent(float v) {
@@ -421,9 +409,7 @@ public class MapFragmentView {
         }
 
         @Override
-        public void onLongPressRelease() {
-
-        }
+        public void onLongPressRelease() {        }
 
         @Override
         public boolean onTwoFingerTapEvent(@NonNull PointF pointF) {
@@ -431,49 +417,71 @@ public class MapFragmentView {
         }
     };
 
-    private FTCRNavigationManager.FTCRNavigationManagerListener m_FTCRNavigationListener = new FTCRNavigationManager.FTCRNavigationManagerListener() {
+    /**
+     * Contains listener functions for navigation callbacks.
+     */
+    private final FTCRNavigationManager.FTCRNavigationManagerListener m_FTCRNavigationListener = new FTCRNavigationManager.FTCRNavigationManagerListener() {
         @Override
-        public void onCurrentManeuverChanged(@Nullable FTCRManeuver ftcrManeuver, @Nullable FTCRManeuver ftcrManeuver1) {
-
-        }
+        public void onCurrentManeuverChanged(@Nullable FTCRManeuver ftcrManeuver, @Nullable FTCRManeuver ftcrManeuver1) {        }
 
         @Override
-        public void onStopoverReached(int i) {
-
-        }
+        public void onStopoverReached(int i) {        }
 
         @Override
         public void onDestinationReached() {
             // ONLY IF USING SIMULATION
             //posManager.setDataSource(LocationDataSourceHERE.getInstance());
+            MainActivity.speak(activity.getResources().getString(R.string.arrived));
         }
 
         @Override
-        public void onRerouteBegin() {
+        public void onRerouteBegin() {        }
 
+        @Override
+        public void onRerouteEnd(@Nullable FTCRRoute newRoute, @NonNull FTCRRouter.ErrorResponse error) {
+            // We must remove the old route from the map and add the new one
+            if (error.getErrorCode() == RoutingError.NONE && newRoute != null) {
+                MainActivity.speak(activity.getResources().getString(R.string.rerouting));
+                drawRoute(newRoute);
+            }
         }
 
         @Override
-        public void onRerouteEnd(@Nullable FTCRRoute ftcrRoute, @NonNull FTCRRouter.ErrorResponse errorResponse) {
+        public void onLaneInformation(@NonNull List<FTCRLaneInformation> list) {        }
+    };
 
+    /**
+     * Handles audio to be played during navigation.
+     */
+    private final AudioPlayerDelegate m_audioPlayerDelegate = new AudioPlayerDelegate() {
+        @Override public boolean playText(@NonNull final String s) {
+            //showToast("TTS output: " + s);
+            if (s.contains("on") && !s.contains("arrive")) {
+                MainActivity.speak(s.substring(0, s.indexOf("on")));
+            }
+            return true;
         }
 
-        @Override
-        public void onLaneInformation(@NonNull List<FTCRLaneInformation> list) {
-
+        @Override public boolean playFiles(@NonNull String[] strings) {
+            return false;
         }
     };
 
-    private AudioPlayerDelegate m_audioPlayerDelegate = new AudioPlayerDelegate() {
-        @Override public boolean playText(final String s) {
-            showToast("TTS output: " + s);
-            return false;
+    /**
+     * Draws a given route onto the map and removes previous route.
+     *
+     * @param route the route to draw on the map
+     */
+    private void drawRoute(FTCRRoute route) {
+        if (currentRoute != null) {
+            map.removeMapObject(currentRoute);
         }
-
-        @Override public boolean playFiles(String[] strings) {
-            return false;
-        }
-    };
+        currentRoute = new MapPolyline(new GeoPolyline(route.getGeometry()));
+        currentRoute.setLineColor(Color.argb(255, 185, 63, 2));
+        currentRoute.setLineWidth(15);
+        currentRoute.setPatternStyle(MapPolyline.PatternStyle.DASH_PATTERN);
+        map.addMapObject(currentRoute);
+    }
 
     /**
      * Update location information to the text view.
