@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">UNCA Nav</string>
+    <string name="app_name">UNCANav</string>
     <string name="engine_init_error">Map engine initialization</string>
     <string name="m_data_install_complete">Map data installation completed</string>
     <string name="m_data_install_fail">Map data installation failed</string>
@@ -11,9 +11,11 @@
     <string name="update_complete">Updates completed</string>
     <string name="fetching_map_content">Fetching map content</string>
     <string name="pos_found">Welcome to UNCA Nav</string>
+    <string name="pos_failed">Positioning failed</string>
     <string name="loc_method_change">Location method changed to</string>
     <string name="waiting_positioning">Waiting for position updates…</string>
     <string name="start_map_dl">Starting map data update</string>
     <string name="rerouting">Rerouting</string>
     <string name="arrived">You have arrived</string>
+    <string name="route_error">Route calculation error</string>
 </resources>

@@ -1,11 +1,9 @@
 package com.schrold.uncanav;
 
 import android.app.AlertDialog;
-import android.content.DialogInterface;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.PointF;
-import android.speech.tts.TextToSpeech;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -31,7 +29,6 @@ import com.here.android.mpa.ftcr.FTCRRoutePlan;
 import com.here.android.mpa.ftcr.FTCRRouter;
 import com.here.android.mpa.ftcr.FTCRVoiceGuidanceOptions;
 import com.here.android.mpa.guidance.AudioPlayerDelegate;
-import com.here.android.mpa.mapping.FTCRMapRoute;
 import com.here.android.mpa.mapping.Map;
 import com.here.android.mpa.mapping.MapGesture.OnGestureListener;
 import com.here.android.mpa.mapping.MapMarker;
@@ -90,6 +87,8 @@ public class MapFragmentView {
 
     private MapPolyline currentRoute;
 
+    //TODO: get rid of
+    private PointF tapPoint;
 
     /**
      * Constructor for the MapFragmentView class.
@@ -114,10 +113,9 @@ public class MapFragmentView {
      * Initializes the map engine and starts positioning updates.
      */
     public void initialize() {
-        mapFragment.init(new OnEngineInitListener() {
+        OnEngineInitListener m_onEngineInitListener = new OnEngineInitListener() {
             @Override
-            public void onEngineInitializationCompleted(
-                    final OnEngineInitListener.Error error) {
+            public void onEngineInitializationCompleted(final OnEngineInitListener.Error error) {
                 if (error == OnEngineInitListener.Error.NONE) {
                     // Add listener for venues
                     mapFragment.addListener(m_venueListener);
@@ -146,7 +144,9 @@ public class MapFragmentView {
                     showErrorMessage(error.name(), error.getDetails());
                 }
             }
-        }, new VenueService.VenueServiceListener() {
+        };
+
+        VenueService.VenueServiceListener m_venueServiceListener = new VenueService.VenueServiceListener() {
             @Override
             public void onInitializationCompleted(VenueService.InitStatus initStatus) {
                 switch (initStatus) {
@@ -175,12 +175,14 @@ public class MapFragmentView {
                         break;
                     default:
                         // Initialization failed, retry
-                        System.out.println("INITSTATUS:" + initStatus.toString());
+                        System.out.println("Initialization status:" + initStatus.toString());
                         initialize();
                         break;
                 }
             }
-        });
+        };
+
+        mapFragment.init(m_onEngineInitListener, m_venueServiceListener);
     }
 
     /**
@@ -193,7 +195,7 @@ public class MapFragmentView {
         posManager.setDataSource(LocationDataSourceHERE.getInstance());
         posManager.addListener(new WeakReference<>(m_onPositionChangedListener));
         if (!posManager.start(LOCATION_METHOD)) {
-            showToast("PositioningManager.start: Failed.");
+            MainActivity.speak(activity.getResources().getString(R.string.pos_failed));
             return false;
         }
         // Set the position and accuracy indicator to be visible
@@ -212,13 +214,107 @@ public class MapFragmentView {
     }
 
     /**
+     * Handles audio to be played during navigation.
+     */
+    private final AudioPlayerDelegate m_audioPlayerDelegate = new AudioPlayerDelegate() {
+        @Override public boolean playText(@NonNull final String s) {
+            // Trim out 'road names'
+            if (s.contains("on") && !s.contains("arrive")) {
+                MainActivity.speak(s.substring(0, s.indexOf("on")));
+            }
+            return true;
+        }
+
+        @Override public boolean playFiles(@NonNull String[] strings) {
+            return false;
+        }
+    };
+
+    /**
+     * Draws a given route onto the map and removes previous route.
+     *
+     * @param route the route to draw on the map
+     */
+    private void drawRoute(FTCRRoute route) {
+        if (currentRoute != null) {
+            map.removeMapObject(currentRoute);
+        }
+        currentRoute = new MapPolyline(new GeoPolyline(route.getGeometry()));
+        currentRoute.setLineColor(Color.argb(255, 185, 63, 2));
+        currentRoute.setLineWidth(15);
+        currentRoute.setPatternStyle(MapPolyline.PatternStyle.DASH_PATTERN);
+        map.addMapObject(currentRoute);
+    }
+
+    //TODO: shit here
+    public void startRouting(String s) {
+        System.out.println(s);
+        /*
+             Create a simple route and show it on screen, starting from current
+             location and ending at tapped location.
+            */
+
+        GeoCoordinate touchLocation = map.pixelToGeo(tapPoint);
+        if (touchLocation != null) {
+            map.removeAllMapObjects();
+
+            double lat = touchLocation.getLatitude();
+            double lon = touchLocation.getLongitude();
+            GeoCoordinate startLocation = new GeoCoordinate(posManager.getPosition().getCoordinate());
+
+            // Show a toast with tapped location geo-coordinate
+            String StrGeo = String.format(Locale.US, "%.6f, %.6f", lat, lon);
+            showToast(StrGeo);
+
+            // Create the RouteOptions and set transport mode & routing type
+            FTCRRouteOptions routeOptions = new FTCRRouteOptions();
+            routeOptions.setTransportMode(FTCRRouteOptions.TransportMode.PEDESTRIAN);
+            routeOptions.setRouteType(FTCRRouteOptions.Type.SHORTEST);
+            routeOptions.enableUTurnAtWaypoint(true);
+
+            // Create the RoutePlan with two waypoints
+            List<RouteWaypoint> routePoints = new ArrayList<>();
+            routePoints.add(new RouteWaypoint(startLocation));
+            routePoints.add(new RouteWaypoint(touchLocation));
+            FTCRRoutePlan routePlan = new FTCRRoutePlan(routePoints, routeOptions);
+
+            // Set the name of the FTCR map overlay to use
+            // See:     https://tcs.ext.here.com/examples/v3/cre_submit_overlay
+            routePlan.setOverlay("OVERLAYRRO1");
+
+            // Add a marker on map for destination
+            MapMarker endMapMarker = new MapMarker(touchLocation);
+            map.addMapObject(endMapMarker);
+
+            // Calculate the route
+            ftcrRoutingTask = router.calculateRoute(routePlan, new FTCRRouter.Listener() {
+                @Override
+                public void onCalculateRouteFinished(@NonNull List<FTCRRoute> routeResults, @NonNull FTCRRouter.ErrorResponse errorResponse) {
+                    // If the route was calculated successfully
+                    if (errorResponse.getErrorCode() == RoutingError.NONE) {
+                        // Draw the route on the map
+                        drawRoute(routeResults.get(0));
+
+                        // Start navigation
+                        navigationManager.simulate(routeResults.get(0), 2);   // causes crash if attempt to stop
+                        //navigationManager.start(routeResults.get(0));
+                    }
+                    else {
+                        MainActivity.speak(activity.getResources().getString(R.string.route_error));
+                    }
+                }
+            });
+        }
+
+    }
+
+    /**
      * Contains listener functions for positioning updates.
      */
     private final PositioningManager.OnPositionChangedListener m_onPositionChangedListener = new OnPositionChangedListener() {
         @Override
         public void onPositionUpdated(PositioningManager.LocationMethod locationMethod, @Nullable GeoPosition geoPosition, boolean b) {
-            /* Set the center only when the app is in the foreground
-            to reduce CPU consumption */
+            // Set the center of the map when app is in foreground
             if (!paused && geoPosition != null) {
                 map.setCenter(geoPosition.getCoordinate(), Map.Animation.BOW);
                 if (!foundPos) {
@@ -235,119 +331,28 @@ public class MapFragmentView {
 
         @Override
         public void onPositionFixChanged(PositioningManager.LocationMethod locationMethod, PositioningManager.LocationStatus locationStatus) {
-            // UNUSED
-            // Called when the location method has changed
-            /*
-            MainActivity.textToSpeech.speak(String.format("%s %s",
-                    activity.getResources().getString(R.string.loc_method_change), locationMethod.toString()),
-                    TextToSpeech.QUEUE_ADD, null, TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID);
-            */
+
         }
     };
 
     /**
-     * Contains listener functions for venue callbacks.
-     */
-    private final VenueMapFragment.VenueListener m_venueListener = new VenueMapFragment.VenueListener() {
-        @Override
-        public void onVenueTapped(Venue venue, float v, float v1) {        }
-
-        @Override
-        public void onVenueSelected(Venue venue) {        }
-
-        @Override
-        public void onVenueDeselected(Venue venue, DeselectionSource deselectionSource) {        }
-
-        @Override
-        public void onSpaceSelected(Venue venue, Space space) {        }
-
-        @Override
-        public void onSpaceDeselected(Venue venue, Space space) {        }
-
-        @Override
-        public void onFloorChanged(Venue venue, Level level, Level level1) {        }
-
-        @Override
-        public void onVenueVisibleInViewport(Venue venue, boolean b) {        }
-    };
-
-    /**
-     * Contains listener functions for gesture input callbacks.
+     * Contains listener functions for input gestures.
      */
     private final OnGestureListener m_onGestureListener = new OnGestureListener() {
         @Override
         public boolean onTapEvent(@NonNull PointF pointF) {
-            /*
-             Create a simple route and show it on screen, starting from current
-             location and ending at tapped location.
+            /*TODO: if navigating currently, disregard input
+                also don't  handle tap to stop speaking, use callback in main activity to change flag
+                after results obtained
             */
             if (!foundPos || mapFragment.getRoutingController() == null){
-                showToast(activity.getResources().getString(R.string.waiting_positioning));
+                MainActivity.speak(activity.getResources().getString(R.string.waiting_positioning));
                 return false;
             }
-            GeoCoordinate touchLocation = map.pixelToGeo(pointF);
-            if (touchLocation != null) {
-                map.removeAllMapObjects();
-
-                double lat = touchLocation.getLatitude();
-                double lon = touchLocation.getLongitude();
-                GeoCoordinate startLocation = new GeoCoordinate(posManager.getPosition().getCoordinate());
-
-                // Show a toast with tapped location geo-coordinate
-                String StrGeo = String.format(Locale.US, "%.6f, %.6f", lat, lon);
-                showToast(StrGeo);
-
-                // Create the RouteOptions and set transport mode & routing type
-                FTCRRouteOptions routeOptions = new FTCRRouteOptions();
-                routeOptions.setTransportMode(FTCRRouteOptions.TransportMode.PEDESTRIAN);
-                routeOptions.setRouteType(FTCRRouteOptions.Type.SHORTEST);
-                routeOptions.enableUTurnAtWaypoint(true);
-
-                // Create the RoutePlan with two waypoints
-                List<RouteWaypoint> routePoints = new ArrayList<>();
-                routePoints.add(new RouteWaypoint(startLocation));
-                routePoints.add(new RouteWaypoint(touchLocation));
-                FTCRRoutePlan routePlan = new FTCRRoutePlan(routePoints, routeOptions);
-
-                // Set the name of the FTCR map overlay to use
-                // See:     https://tcs.ext.here.com/examples/v3/cre_submit_overlay
-                routePlan.setOverlay("OVERLAYRRO1");
-
-                // Add a marker on map for destination
-                MapMarker endMapMarker = new MapMarker(touchLocation);
-                map.addMapObject(endMapMarker);
-
-                // Calculate the route
-                ftcrRoutingTask = router.calculateRoute(routePlan, new FTCRRouter.Listener() {
-                    @Override
-                    public void onCalculateRouteFinished(@NonNull List<FTCRRoute> routeResults, @NonNull FTCRRouter.ErrorResponse errorResponse) {
-                        // If the route was calculated successfully
-                        if (errorResponse.getErrorCode() == RoutingError.NONE) {
-                            // Draw the route on the map
-                            drawRoute(routeResults.get(0));
-
-                            // Start navigation
-                            navigationManager.simulate(routeResults.get(0), 2);   // causes crash if attempt to stop
-                            //navigationManager.start(routeResults.get(0));
-
-                            //TODO: remove
-                            System.out.println("VOICE GUIDANCE STOCK:");
-                            System.out.printf("Dist range from prev maneuver: %d %d%n", navigationManager.getVoiceGuidanceOptions().getVoicePromptDistanceRangeFromPreviousManeuver().min,
-                                    navigationManager.getVoiceGuidanceOptions().getVoicePromptDistanceRangeFromPreviousManeuver().max);
-                            System.out.printf("Dist range to next maneuver: %d %d%n", navigationManager.getVoiceGuidanceOptions().getVoicePromptDistanceRangeToNextManeuver().min,
-                                    navigationManager.getVoiceGuidanceOptions().getVoicePromptDistanceRangeToNextManeuver().max);
-                            System.out.println(navigationManager.getVoiceGuidanceOptions().getVoicePromptTimeBasedDistanceToNextManeuver());
-                            System.out.printf("Time range from prev maneuver: %d %d%n",navigationManager.getVoiceGuidanceOptions().getVoicePromptTimeRangeFromPreviousManeuver().min,
-                                    navigationManager.getVoiceGuidanceOptions().getVoicePromptTimeRangeFromPreviousManeuver().max);
-                            System.out.printf("Time range to next maneuver: %d %d%n",navigationManager.getVoiceGuidanceOptions().getVoicePromptTimeRangeToNextManeuver().min,
-                                    navigationManager.getVoiceGuidanceOptions().getVoicePromptTimeRangeToNextManeuver().max);
-                        }
-                        else {
-                            showToast("Route calculation error!");
-                        }
-                    }
-                });
+            if (!navigationManager.isActive()) {
+                activity.runOnUiThread(MainActivity::startListening);
             }
+            tapPoint = pointF;
             return true;
         }
 
@@ -429,8 +434,7 @@ public class MapFragmentView {
 
         @Override
         public void onDestinationReached() {
-            // ONLY IF USING SIMULATION
-            //posManager.setDataSource(LocationDataSourceHERE.getInstance());
+            // Notify the user
             MainActivity.speak(activity.getResources().getString(R.string.arrived));
         }
 
@@ -451,37 +455,30 @@ public class MapFragmentView {
     };
 
     /**
-     * Handles audio to be played during navigation.
+     * Contains listener functions for venue callbacks.
      */
-    private final AudioPlayerDelegate m_audioPlayerDelegate = new AudioPlayerDelegate() {
-        @Override public boolean playText(@NonNull final String s) {
-            //showToast("TTS output: " + s);
-            if (s.contains("on") && !s.contains("arrive")) {
-                MainActivity.speak(s.substring(0, s.indexOf("on")));
-            }
-            return true;
-        }
+    private final VenueMapFragment.VenueListener m_venueListener = new VenueMapFragment.VenueListener() {
+        @Override
+        public void onVenueTapped(Venue venue, float v, float v1) {        }
 
-        @Override public boolean playFiles(@NonNull String[] strings) {
-            return false;
-        }
+        @Override
+        public void onVenueSelected(Venue venue) {        }
+
+        @Override
+        public void onVenueDeselected(Venue venue, DeselectionSource deselectionSource) {        }
+
+        @Override
+        public void onSpaceSelected(Venue venue, Space space) {        }
+
+        @Override
+        public void onSpaceDeselected(Venue venue, Space space) {        }
+
+        @Override
+        public void onFloorChanged(Venue venue, Level level, Level level1) {        }
+
+        @Override
+        public void onVenueVisibleInViewport(Venue venue, boolean b) {        }
     };
-
-    /**
-     * Draws a given route onto the map and removes previous route.
-     *
-     * @param route the route to draw on the map
-     */
-    private void drawRoute(FTCRRoute route) {
-        if (currentRoute != null) {
-            map.removeMapObject(currentRoute);
-        }
-        currentRoute = new MapPolyline(new GeoPolyline(route.getGeometry()));
-        currentRoute.setLineColor(Color.argb(255, 185, 63, 2));
-        currentRoute.setLineWidth(15);
-        currentRoute.setPatternStyle(MapPolyline.PatternStyle.DASH_PATTERN);
-        map.addMapObject(currentRoute);
-    }
 
     /**
      * Update location information to the text view.
@@ -586,17 +583,11 @@ public class MapFragmentView {
 
     /**
      * Display a toast on the UI thread.
-     *
+     * TODO: remove this method
      * @param message the message to display
      */
     private void showToast(final String message) {
-        activity.runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                Toast.makeText(activity.getApplicationContext(), message, Toast.LENGTH_LONG)
-                        .show();
-            }
-        });
+        activity.runOnUiThread(() -> Toast.makeText(activity.getApplicationContext(), message, Toast.LENGTH_LONG).show());
     }
 
     /**
@@ -606,22 +597,11 @@ public class MapFragmentView {
      * @param errorDetails the details of the error
      */
     private void showErrorMessage(final String errorName, final String errorDetails) {
-        activity.runOnUiThread(new Runnable() {
-            @Override public void run() {
-                new AlertDialog.Builder(activity).setMessage(
-                        "Error : " + errorName + "\n\n" + errorDetails)
-                        .setTitle(R.string.engine_init_error)
-                        .setNegativeButton(android.R.string.ok,
-                                new DialogInterface.OnClickListener() {
-                                    @Override
-                                    public void onClick(
-                                            DialogInterface dialog,
-                                            int which) {
-                                        activity.finishAffinity();
-                                    }
-                                }).create().show();
-            }
-        });
+        activity.runOnUiThread(() -> new AlertDialog.Builder(activity).setMessage(
+                "Error : " + errorName + "\n\n" + errorDetails)
+                .setTitle(R.string.engine_init_error)
+                .setNegativeButton(android.R.string.ok,
+                        (dialog, which) -> activity.finishAffinity()).create().show());
     }
 
     /**

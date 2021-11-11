@@ -17,6 +17,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:allowBackup="false"
@@ -72,10 +73,13 @@
     </application>
 
     <queries>
+        <!-- Necessary for text to speech -->
         <intent>
             <action
                 android:name="android.intent.action.TTS_SERVICE" />
         </intent>
+        <!-- Necessary for speech recognition -->
+        <package android:name="com.google.android.googlequicksearchbox"/>
     </queries>
 
 
