@@ -1,2 +1,2 @@
 # UNCANav
-Localized location application to assist visually impaired on UNCA campus.
+A mobile application to assist visually impaired persons with indoor navigation on the UNCA campus.
