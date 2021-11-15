@@ -106,7 +106,7 @@ public class MainActivity extends AppCompatActivity {
         // Update and download map data in background thread
         executorService.execute(runMapDownload());
 
-        // Set up the speech recognizer
+        // Initialize the speech recognizer
         // NOTE: in order to work, device must have Google search bar package
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
         speechRecognizerIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
@@ -117,9 +117,9 @@ public class MainActivity extends AppCompatActivity {
             public void onResults(Bundle bundle) {
                 // Successful speech recognition
                 ArrayList<String> data = bundle.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                System.out.println("RESULTS: " + data.get(0));
-                mapFragmentView.startRouting(data.get(0));
-                stopListening();
+                System.out.println("SPEECH RESULTS: " + data.get(0));
+                mapFragmentView.speechCallback(data.get(0));
+                userSpeaking = false;
             }
 
             @Override
@@ -138,7 +138,10 @@ public class MainActivity extends AppCompatActivity {
             public void onEndOfSpeech() {            }
 
             @Override
-            public void onError(int i) {            }
+            public void onError(int i) {
+                //speak(getResources().getString(R.string.speech_error));
+                System.out.println(String.format("speech error %d", i));
+            }
 
             @Override
             public void onPartialResults(Bundle bundle) {            }
@@ -164,6 +167,7 @@ public class MainActivity extends AppCompatActivity {
             startMap();
         } else {
             // Map data failed to download
+            //TODO: error popup window, move from fragment view
             System.out.println("ERROR: Map data failed to download.");
             finish();
         }

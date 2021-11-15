@@ -102,8 +102,6 @@ public class MapDownloadActivity_bbox extends AppCompatActivity
                     m_mapLoader.getMapPackageAtCoordinate(new GeoCoordinate(35.615330, -82.5659220));
                 } else {
                     // Error initializing MapEngine, finish
-                    Toast.makeText(getApplicationContext(), String.format("Error: %s", error.toString()), Toast.LENGTH_LONG)
-                            .show();
                     finishResult(RESULT_CANCELED);
                 }
             }
@@ -114,8 +112,8 @@ public class MapDownloadActivity_bbox extends AppCompatActivity
     public void onGetMapPackageAtCoordinateComplete(@Nullable MapPackage mapPackage, @Nullable GeoCoordinate geoCoordinate, MapLoader.ResultCode resultCode) {
         if (resultCode == MapLoader.ResultCode.OPERATION_SUCCESSFUL) {
             textView.setText(R.string.map_pack_retrieved);
-            // Prefetch map using bounding box
 
+            // Prefetch map using bounding box around campus
             m_mapDataPrefetcher = MapDataPrefetcher.getInstance();
 
             m_mapDataPrefetcher.addListener(new PrefetchMapDataListener());
@@ -137,7 +135,7 @@ public class MapDownloadActivity_bbox extends AppCompatActivity
     /**
      * Contains callback functions for the MapDataPrefetcher.
      */
-    private class PrefetchMapDataListener extends MapDataPrefetcher.Adapter {
+    private class PrefetchMapDataListener implements MapDataPrefetcher.Listener {
         @Override
         public void onDataSizeEstimated(int requestId, boolean success, long dataSizeKB) {
             if (success) {
@@ -166,7 +164,7 @@ public class MapDownloadActivity_bbox extends AppCompatActivity
                 // Fetched map package
                 finishResult(RESULT_OK);
             } else if (status == PrefetchStatus.PREFETCH_FAILURE || status == PrefetchStatus.PREFETCH_CANCELLED){
-                // Failure, retry
+                // Network failure, retry
                 m_mapDataPrefetcher.cancelAllRequests();
                 m_mapDataPrefetcher.fetchMapData(m_geoBoundingBox);
             }
@@ -175,7 +173,7 @@ public class MapDownloadActivity_bbox extends AppCompatActivity
 
         @Override
         public void onCachePurged(boolean b) {
-            // Unused
+
         }
     }
 

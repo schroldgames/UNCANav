@@ -47,6 +47,8 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Wrapper class to handle everything related to the map fragment. Also handles positioning and
@@ -247,7 +249,7 @@ public class MapFragmentView {
     }
 
     //TODO: shit here
-    public void startRouting(String s) {
+    private void startRouting(String s) {
         System.out.println(s);
         /*
              Create a simple route and show it on screen, starting from current
@@ -309,6 +311,46 @@ public class MapFragmentView {
     }
 
     /**
+     * Stops navigation and removes routing overlays from map.
+     */
+    private void stopRouting() {
+        if (navigationManager != null && navigationManager.isActive()) {
+            navigationManager.getAudioPlayer().stop();
+            navigationManager.stop();
+        }
+        if (ftcrRoutingTask != null) {
+            ftcrRoutingTask.cancel();
+        }
+        map.removeAllMapObjects();
+    }
+
+    /**
+     * Callback function for handling speech recognizer results. If result matches
+     * a valid destination, begin routing.
+     *
+     * @param result the string captured by the speech recognizer
+     */
+    public void speechCallback(String result) {
+        // Check if user cancelled input
+        Pattern cancel = Pattern.compile("cancel|nevermind|never mind", Pattern.CASE_INSENSITIVE);
+        if (result != null && !cancel.matcher(result).find()) {
+            // Check if input contains a room number or bathroom
+            Pattern p_num = Pattern.compile("\\d+|bathroom");
+            Matcher m = p_num.matcher(result);
+            boolean no_dest = true;
+            if (m.find()) {
+                // Possible destination, check if in list, if not, no_dest
+                String match = m.group();
+                System.out.println(String.format("regex match: %s", match));
+                no_dest = false;
+            }
+            // If there is no destination, tell user
+            if (no_dest)
+                MainActivity.speak(activity.getResources().getString(R.string.no_destination));
+        }
+    }
+
+    /**
      * Contains listener functions for positioning updates.
      */
     private final PositioningManager.OnPositionChangedListener m_onPositionChangedListener = new OnPositionChangedListener() {
@@ -341,32 +383,23 @@ public class MapFragmentView {
     private final OnGestureListener m_onGestureListener = new OnGestureListener() {
         @Override
         public boolean onTapEvent(@NonNull PointF pointF) {
-            /*TODO: if navigating currently, disregard input
-                also don't  handle tap to stop speaking, use callback in main activity to change flag
-                after results obtained
-            */
-            if (!foundPos || mapFragment.getRoutingController() == null){
+            // Do not accept input unless navigation manager has been initialized
+            if (!foundPos || navigationManager == null){
                 MainActivity.speak(activity.getResources().getString(R.string.waiting_positioning));
                 return false;
             }
+            // If not navigating, attempt speech recognition
             if (!navigationManager.isActive()) {
                 activity.runOnUiThread(MainActivity::startListening);
             }
+            //TODO: remove
             tapPoint = pointF;
             return true;
         }
 
         @Override
         public boolean onDoubleTapEvent(@NonNull PointF pointF) {
-            // Remove all map objects on screen and stop navigation
-            if (navigationManager != null && navigationManager.isActive()) {
-                navigationManager.getAudioPlayer().stop();
-                navigationManager.stop();
-            }
-            if (ftcrRoutingTask != null) {
-                ftcrRoutingTask.cancel();
-            }
-            map.removeAllMapObjects();
+            stopRouting();
             return true;
         }
 
