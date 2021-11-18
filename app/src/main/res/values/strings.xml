@@ -20,4 +20,5 @@
     <string name="route_error">Route calculation error</string>
     <string name="speech_error">speech recognition error</string>
     <string name="no_destination">destination not found</string>
+    <string name="start_nav">starting navigation</string>
 </resources>

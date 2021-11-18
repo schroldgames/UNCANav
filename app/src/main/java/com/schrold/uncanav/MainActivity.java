@@ -139,8 +139,10 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onError(int i) {
-                //speak(getResources().getString(R.string.speech_error));
+                // Usually only called if microphone not available
+                speak(getResources().getString(R.string.speech_error));
                 System.out.println(String.format("speech error %d", i));
+                userSpeaking = false;
             }
 
             @Override
@@ -310,10 +312,13 @@ public class MainActivity extends AppCompatActivity {
         if(textToSpeech != null && canSpeak) {
             textToSpeech.stop();
         }
-
         // Stop positioning updates
         if (mapFragmentView != null) {
             mapFragmentView.pause();
+        }
+        if (userSpeaking) {
+            speechRecognizer.cancel();
+            userSpeaking = false;
         }
         super.onPause();
     }
@@ -340,7 +345,6 @@ public class MainActivity extends AppCompatActivity {
             textToSpeech.stop();
             textToSpeech.shutdown();
         }
-
         // Stops positioning updates
         if (mapFragmentView != null) {
             mapFragmentView.destroy();
@@ -348,6 +352,7 @@ public class MainActivity extends AppCompatActivity {
         }
         // Shuts down thread executor service
         executorService.shutdown();
+        speechRecognizer.cancel();
         speechRecognizer.destroy();
         super.onDestroy();
     }

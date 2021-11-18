@@ -45,6 +45,7 @@ import com.here.android.mpa.venues3d.VenueService;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -74,6 +75,7 @@ public class MapFragmentView {
     // The router object
     private FTCRRouter router;
 
+    // The navigation manager
     private FTCRNavigationManager navigationManager;
 
     // Reference to the main activity
@@ -83,10 +85,13 @@ public class MapFragmentView {
     private final PositioningManager.LocationMethod LOCATION_METHOD
             = PositioningManager.LocationMethod.GPS_NETWORK_INDOOR;
 
+    // Current routing task
     private FTCRRouter.CancellableTask ftcrRoutingTask;
 
+    // Flag to determine if user has been welcomed
     private boolean speak_welcome = false;
 
+    // Map object indicating current route
     private MapPolyline currentRoute;
 
     //TODO: get rid of
@@ -248,66 +253,53 @@ public class MapFragmentView {
         map.addMapObject(currentRoute);
     }
 
-    //TODO: shit here
-    private void startRouting(String s) {
-        System.out.println(s);
-        /*
-             Create a simple route and show it on screen, starting from current
-             location and ending at tapped location.
-            */
+    /**
+     * Begins the routing process using a GeoCoordinate as input.
+     *
+     * @param destination the GeoCoordinate of the destination
+     */
+    private void startRouting(GeoCoordinate destination) {
+        // Clear the map
+        map.removeAllMapObjects();
 
-        GeoCoordinate touchLocation = map.pixelToGeo(tapPoint);
-        if (touchLocation != null) {
-            map.removeAllMapObjects();
+        // Create the RouteOptions and set transport mode & routing type
+        FTCRRouteOptions routeOptions = new FTCRRouteOptions();
+        routeOptions.setTransportMode(FTCRRouteOptions.TransportMode.PEDESTRIAN);
+        routeOptions.setRouteType(FTCRRouteOptions.Type.SHORTEST);
+        routeOptions.enableUTurnAtWaypoint(true);
 
-            double lat = touchLocation.getLatitude();
-            double lon = touchLocation.getLongitude();
-            GeoCoordinate startLocation = new GeoCoordinate(posManager.getPosition().getCoordinate());
+        // Create the RoutePlan with two waypoints
+        List<RouteWaypoint> routePoints = new ArrayList<>();
+        GeoCoordinate currentLocation = new GeoCoordinate(posManager.getPosition().getCoordinate());
+        routePoints.add(new RouteWaypoint(currentLocation));
+        routePoints.add(new RouteWaypoint(destination));
+        FTCRRoutePlan routePlan = new FTCRRoutePlan(routePoints, routeOptions);
 
-            // Show a toast with tapped location geo-coordinate
-            String StrGeo = String.format(Locale.US, "%.6f, %.6f", lat, lon);
-            showToast(StrGeo);
+        // Set the name of the FTCR map overlay to use
+        // See:     https://tcs.ext.here.com/examples/v3/cre_submit_overlay
+        routePlan.setOverlay("OVERLAYRRO1");
 
-            // Create the RouteOptions and set transport mode & routing type
-            FTCRRouteOptions routeOptions = new FTCRRouteOptions();
-            routeOptions.setTransportMode(FTCRRouteOptions.TransportMode.PEDESTRIAN);
-            routeOptions.setRouteType(FTCRRouteOptions.Type.SHORTEST);
-            routeOptions.enableUTurnAtWaypoint(true);
+        // Add a marker on map for destination
+        MapMarker endMapMarker = new MapMarker(destination);
+        map.addMapObject(endMapMarker);
 
-            // Create the RoutePlan with two waypoints
-            List<RouteWaypoint> routePoints = new ArrayList<>();
-            routePoints.add(new RouteWaypoint(startLocation));
-            routePoints.add(new RouteWaypoint(touchLocation));
-            FTCRRoutePlan routePlan = new FTCRRoutePlan(routePoints, routeOptions);
-
-            // Set the name of the FTCR map overlay to use
-            // See:     https://tcs.ext.here.com/examples/v3/cre_submit_overlay
-            routePlan.setOverlay("OVERLAYRRO1");
-
-            // Add a marker on map for destination
-            MapMarker endMapMarker = new MapMarker(touchLocation);
-            map.addMapObject(endMapMarker);
-
-            // Calculate the route
-            ftcrRoutingTask = router.calculateRoute(routePlan, new FTCRRouter.Listener() {
-                @Override
-                public void onCalculateRouteFinished(@NonNull List<FTCRRoute> routeResults, @NonNull FTCRRouter.ErrorResponse errorResponse) {
-                    // If the route was calculated successfully
-                    if (errorResponse.getErrorCode() == RoutingError.NONE) {
-                        // Draw the route on the map
-                        drawRoute(routeResults.get(0));
-
-                        // Start navigation
-                        navigationManager.simulate(routeResults.get(0), 2);   // causes crash if attempt to stop
-                        //navigationManager.start(routeResults.get(0));
-                    }
-                    else {
-                        MainActivity.speak(activity.getResources().getString(R.string.route_error));
-                    }
+        // Calculate the route
+        ftcrRoutingTask = router.calculateRoute(routePlan, new FTCRRouter.Listener() {
+            @Override
+            public void onCalculateRouteFinished(@NonNull List<FTCRRoute> routeResults, @NonNull FTCRRouter.ErrorResponse errorResponse) {
+                // If the route was calculated successfully
+                if (errorResponse.getErrorCode() == RoutingError.NONE) {
+                    // Draw the route on the map
+                    drawRoute(routeResults.get(0));
+                    // Start navigation
+                    //navigationManager.simulate(routeResults.get(0), 2);   // causes crash if attempt to stop
+                    navigationManager.start(routeResults.get(0));
                 }
-            });
-        }
-
+                else {
+                    MainActivity.speak(activity.getResources().getString(R.string.route_error));
+                }
+            }
+        });
     }
 
     /**
@@ -325,6 +317,33 @@ public class MapFragmentView {
     }
 
     /**
+     * A HashMap containing key-value pairs for room numbers and their coordinates.
+     */
+    private final HashMap<String, GeoCoordinate> classrooms = new HashMap<String, GeoCoordinate>() {{
+        put("106", new GeoCoordinate(35.615634,-82.565787));
+        put("111", new GeoCoordinate(35.615754,-82.565703));
+        put("113", new GeoCoordinate(35.615784,-82.565677));
+        put("114", new GeoCoordinate(35.615817,-82.56563));
+        put("115", new GeoCoordinate(35.615852,-82.565596));
+        put("117", new GeoCoordinate(35.61586,-82.565557));
+
+        put("108", new GeoCoordinate(35.615657,-82.56567));
+        put("110", new GeoCoordinate(35.615706,-82.56561));
+        put("112", new GeoCoordinate(35.615722,-82.56559));
+        put("116", new GeoCoordinate(35.615793,-82.565531));
+
+        put("125", new GeoCoordinate(35.615969,-82.565366));
+        put("126", new GeoCoordinate(35.61595,-82.565331));
+        put("127", new GeoCoordinate(35.615933,-82.565303));
+        put("128", new GeoCoordinate(35.615915,-82.565272));
+
+        put("131", new GeoCoordinate(35.615854,-82.565222));
+        put("132", new GeoCoordinate(35.615778,-82.565294));
+        put("135", new GeoCoordinate(35.615685,-82.565379));
+        put("138", new GeoCoordinate(35.615584,-82.565464));
+    }};
+
+    /**
      * Callback function for handling speech recognizer results. If result matches
      * a valid destination, begin routing.
      *
@@ -337,16 +356,22 @@ public class MapFragmentView {
             // Check if input contains a room number or bathroom
             Pattern p_num = Pattern.compile("\\d+|bathroom");
             Matcher m = p_num.matcher(result);
+            String match = "";
             boolean no_dest = true;
             if (m.find()) {
-                // Possible destination, check if in list, if not, no_dest
-                String match = m.group();
-                System.out.println(String.format("regex match: %s", match));
-                no_dest = false;
+                // Possible destination, check if in room hashmap
+                match = m.group();
+                System.out.printf("regex match: %s%n", match);
+                if (classrooms.containsKey(match)) {
+                    MainActivity.speak(activity.getResources().getString(R.string.start_nav));
+                    no_dest = false;
+                }
             }
             // If there is no destination, tell user
             if (no_dest)
                 MainActivity.speak(activity.getResources().getString(R.string.no_destination));
+            else
+                startRouting(classrooms.get(match));
         }
     }
 
@@ -383,6 +408,7 @@ public class MapFragmentView {
     private final OnGestureListener m_onGestureListener = new OnGestureListener() {
         @Override
         public boolean onTapEvent(@NonNull PointF pointF) {
+            // GeoCoordinate touchLocation = map.pixelToGeo(tapPoint);
             // Do not accept input unless navigation manager has been initialized
             if (!foundPos || navigationManager == null){
                 MainActivity.speak(activity.getResources().getString(R.string.waiting_positioning));
@@ -392,13 +418,12 @@ public class MapFragmentView {
             if (!navigationManager.isActive()) {
                 activity.runOnUiThread(MainActivity::startListening);
             }
-            //TODO: remove
-            tapPoint = pointF;
             return true;
         }
 
         @Override
         public boolean onDoubleTapEvent(@NonNull PointF pointF) {
+            // Stop routing when user double taps the screen
             stopRouting();
             return true;
         }
