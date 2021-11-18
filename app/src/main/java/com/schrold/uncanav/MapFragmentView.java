@@ -332,15 +332,15 @@ public class MapFragmentView {
         put("112", new GeoCoordinate(35.615722,-82.56559));
         put("116", new GeoCoordinate(35.615793,-82.565531));
 
-        put("125", new GeoCoordinate(35.615969,-82.565366));
-        put("126", new GeoCoordinate(35.61595,-82.565331));
-        put("127", new GeoCoordinate(35.615933,-82.565303));
-        put("128", new GeoCoordinate(35.615915,-82.565272));
+        put("125", new GeoCoordinate(35.61594,-82.565401));
+        put("126", new GeoCoordinate(35.615906,-82.565364));
+        put("127", new GeoCoordinate(35.61589,-82.565319));
+        put("128", new GeoCoordinate(35.615863,-82.5653));
 
-        put("131", new GeoCoordinate(35.615854,-82.565222));
-        put("132", new GeoCoordinate(35.615778,-82.565294));
-        put("135", new GeoCoordinate(35.615685,-82.565379));
-        put("138", new GeoCoordinate(35.615584,-82.565464));
+        put("131", new GeoCoordinate(35.615789,-82.56522));
+        put("132", new GeoCoordinate(35.615726,-82.565289));
+        put("135", new GeoCoordinate(35.615655,-82.56536));
+        put("138", new GeoCoordinate(35.615558,-82.565471));
     }};
 
     /**
