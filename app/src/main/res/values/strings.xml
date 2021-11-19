@@ -14,7 +14,7 @@
     <string name="pos_failed">Positioning failed</string>
     <string name="loc_method_change">Location method changed to</string>
     <string name="waiting_positioning">Waiting for position updates…</string>
-    <string name="start_map_dl">Starting map data update</string>
+    <string name="start_map_dl">updating map data</string>
     <string name="rerouting">Rerouting</string>
     <string name="arrived">You have arrived</string>
     <string name="route_error">Route calculation error</string>
